@@ -1,3 +1,4 @@
+# encoding=utf8
 import os, sys
 import requests, time, re
 import thread, subprocess
@@ -5,6 +6,33 @@ import json, xml.dom.minidom, mimetypes
 import config, storage, out, tools
 
 BASE_URL = config.BASE_URL
+
+from PIL import Image 
+import sys, os, platform
+
+BLOCK = '\033[47m  \033[0m'
+
+class QRCode():
+    def __init__(self, fileName, size, padding = 0, background = 'BLACK'):
+        self.size = size
+        self.padding = padding
+        self.img = Image.open(fileName)
+        self.times = self.img.size[0]/(size + padding * 2)
+        self.rgb = self.img.convert('RGB')
+        self.white = BLOCK if background == 'BLACK' else '  '
+        self.black = '  ' if background == 'BLACK' else BLOCK 
+    def print_qr(self):
+        sys.stdout.write(' '*50 + '\r')
+        sys.stdout.flush()
+        print self.white * (self.size + 2)
+        startPoint = self.padding + 0.5
+        for y in range(self.size):
+            sys.stdout.write(self.white)
+            for x in range(self.size):
+                r,g,b = self.rgb.getpixel(((x + startPoint) * self.times, (y + startPoint) * self.times))
+                sys.stdout.write(self.white if r > 127 else self.black)
+            print self.white
+        print self.white * (self.size + 2)
 
 class client:
     def __init__(self):
@@ -19,9 +47,12 @@ class client:
         def open_QR():
             for get_count in range(10):
                 out.print_line('Getting uuid', True)
-                while not self.get_QRuuid(): time.sleep(1)
+                while not self.get_QRuuid():
+                    print "aaaa"
+                    time.sleep(1)
                 out.print_line('Getting QR Code', True)
-                if self.get_QR(): break
+                if self.get_QR():
+                    break
                 elif get_count >= 9:
                     out.print_line('Failed to get QR Code, please restart the program')
                     sys.exit()
@@ -50,27 +81,30 @@ class client:
             'fun': 'new',
         }
         r = self.s.get(url, params = payloads)
-
         regx = r'window.QRLogin.code = (\d+); window.QRLogin.uuid = "(\S+?)";'
         data = re.search(regx, r.text)
         if data and data.group(1) == '200': 
             self.uuid = data.group(2)
             return self.uuid
     def get_QR(self, uuid = None):
+        QR_DIR = 'QR.jpg'
         try:
             if uuid == None: uuid = self.uuid
             url = '%s/qrcode/%s'%(BASE_URL, uuid)
             r = self.s.get(url, stream = True)
-            QR_DIR = 'QR.jpg'
             with open(QR_DIR, 'wb') as f: f.write(r.content)
-            if config.OS == 'Darwin':
-                subprocess.call(['open', QR_DIR])
-            elif config.OS == 'Linux':
-                subprocess.call(['xdg-open', QR_DIR])
-            else:
-                os.startfile(QR_DIR)
+            q = QRCode(QR_DIR, 37, 3, 'BLACK')
+            q.print_qr()
+            #with open(QR_DIR, 'wb') as f: f.write(r.content)
+            #if config.OS == 'Darwin':
+            #    subprocess.call(['open', QR_DIR])
+            #elif config.OS == 'Linux':
+            #    subprocess.call(['xdg-open', QR_DIR])
+            #else:
+            #    os.startfile(QR_DIR)
             return True
         except:
+            raise
             return False
     def check_login(self, uuid = None):
         if uuid is None: uuid = self.uuid
@@ -360,8 +394,6 @@ class client:
             else:
                 return '', content
         ActualUserName, Content = get_msg_from_raw(msg['Content'])
-        isAt = self.storageClass.nickName in Content
-        if '\342\200\205'.decode('utf8') in Content: Content = Content.split('\342\200\205'.decode('utf8'))[1]
         try:
             self.storageClass.groupDict[msg['FromUserName']][ActualUserName]
         except:
@@ -371,7 +403,7 @@ class client:
         additionalItems = {
             'ActualUserName': ActualUserName,
             'ActualNickName': ActualNickName,
-            'Content': Content, }
+            'ActualContent': Content}
         return dict(msg, **additionalItems)
     def send_msg(self, msg = 'Test Message', toUserName = None):
         url = '%s/webwxsendmsg'%self.loginInfo['url']

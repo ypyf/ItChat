@@ -1,3 +1,4 @@
+import sys
 import time, thread
 from client import client
 
@@ -41,15 +42,19 @@ def send(msg, toUserName = None):
 __functionDict = {'GroupChat': {}, 'GeneralReply': None}
 def configured_reply():
     try:
-        msg = __client.storageClass.msgList.pop()
-        if '@@' in msg.get('FromUserName'):
-            replyFn = __functionDict['GroupChat'].get(msg['Type'], __functionDict['GeneralReply'])
-            send(replyFn(msg), msg.get('FromUserName'))
-        else:
-            replyFn = __functionDict.get(msg['Type'], __functionDict['GeneralReply'])
-            send(replyFn(msg), msg.get('FromUserName'))
+        if __client.storageClass.msgList:
+            msg = __client.storageClass.msgList.pop()
+            if '@@' in msg.get('FromUserName'):
+                replyFn = __functionDict['GroupChat'].get(msg['Type'], __functionDict['GeneralReply'])
+                send(replyFn(msg), msg.get('FromUserName'))
+            else:
+                replyFn = __functionDict.get(msg['Type'], __functionDict['GeneralReply'])
+                if replyFn:
+                    send(replyFn(msg), msg.get('FromUserName'))
+    except Exception as e:
+        traceback.print_exc(file=sys.stdout)
     except:
-        pass
+        traceback.print_exc(file=sys.stdout)
 
 def msg_register(_type = None, *args, **kwargs):
     if hasattr(_type, '__call__'):
